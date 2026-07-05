@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { box-sizing: border-box; }
+html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#e8e8e8; }
+#deck-container { width:100%; height:100%; position:relative; }
+canvas { outline:none; display:block; }
+
+/* Playback controls */
+#controls {
+  position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+  z-index:100; background:rgba(20,30,50,0.88); color:white;
+  border-radius:10px; padding:7px 14px;
+  font-family:system-ui,-apple-system,sans-serif; font-size:13px;
+  display:flex; align-items:center; gap:10px;
+  user-select:none; white-space:nowrap;
+  box-shadow:0 2px 8px rgba(0,0,0,0.45);
+  pointer-events:all;
+}
+#controls button {
+  background:#3b82f6; color:white; border:none; border-radius:6px;
+  padding:3px 11px; cursor:pointer; font-size:15px;
+}
+#controls button:hover { background:#2563eb; }
+#slider { width:180px; cursor:pointer; accent-color:#3b82f6; }
+#timeLabel { min-width:40px; font-weight:700; font-size:14px; }
+#countLabel { opacity:0.7; font-size:11px; }
+
+/* Vehicle info panel */
+#vinfo {
+  display:none;
+  position:absolute; top:10px; right:10px;
+  z-index:200;
+  background:rgba(15,23,42,0.92); color:#f1f5f9;
+  border-radius:10px; padding:12px 14px;
+  font-family:system-ui,-apple-system,sans-serif; font-size:12px;
+  min-width:180px; max-width:240px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.5);
+  pointer-events:all;
+}
+#vinfo-close {
+  float:right; cursor:pointer; font-size:16px; line-height:1;
+  color:#94a3b8; margin-left:8px;
+}
+#vinfo-close:hover { color:white; }
+#vinfo-title { font-weight:700; font-size:13px; margin-bottom:6px; }
+#vinfo-soc {
+  display:inline-block; border-radius:12px; padding:2px 10px;
+  font-size:11px; font-weight:600; margin-bottom:6px;
+}
+#vinfo-body { color:#cbd5e1; line-height:1.6; }
+</style>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css">
+</head>
+<body>
+<div id="deck-container"></div>
+
+<!-- Playback bar -->
+<div id="controls">
+  <button id="playBtn">⏸</button>
+  <input type="range" id="slider" min="0" max="95" value="0" step="1">
+  <span id="timeLabel">00:00</span>
+  <span id="countLabel"></span>
+  <button id="threeDBtn" title="Toggle 3D columns">3D: off</button>
+  <button id="colBtn" title="Column metric" style="display:none;">Occupancy</button>
+</div>
+
+<!-- Vehicle info panel (shown on click) -->
+<div id="vinfo">
+  <span id="vinfo-close">✕</span>
+  <div id="vinfo-title"></div>
+  <div id="vinfo-soc"></div>
+  <div id="vinfo-body"></div>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/deck.gl@8.9.34/dist.min.js"></script>
+<script>
+const { DeckGL, ScatterplotLayer, PolygonLayer, ColumnLayer } = deck;
+
+// ── State ──────────────────────────────────────────────────────────────────
+let currentT  = 0;
+let playing   = true;
+let deckInst  = null;
+let animTimer = null;
+
+let positions  = [];     // array[nFrames] of Float32Array(2*nV)
+let colors     = [];     // array[nFrames] of Uint8Array(4*nV)
+let vMeta      = [];     // array[nV] of {vid, trip_class, tooltip}
+let staticData = null;
+let signalPos  = [];     // array of [lon,lat]
+let signalCols = [];     // array[nFrames] of flat [r,g,b,a,...]
+let loadedVersion = null;  // version string of the frames currently loaded (ack handshake)
+
+// 3D columns
+let columnPos = [], columnColors = [], columnNames = [];
+let columnElevDem = [], columnElevOcc = [];
+let columnScaleDem = 1, columnScaleOcc = 1;
+let show3d = false;          // 3D columns on/off (reported back → explanation card)
+let columnMode = 'occ';      // 'occ' = occupancy | 'dem' = charging demand
+
+const TIME_LABELS = Array.from({length:96},(_,i)=>
+  `${String(Math.floor(i*15/60)).padStart(2,'0')}:${String((i*15)%60).padStart(2,'0')}`);
+
+const STEP_MS = 500;     // one 15-min frame every 500 ms
+
+// ── Streamlit component protocol ───────────────────────────────────────────
+function sendReady() {
+  window.parent.postMessage({
+    isStreamlitMessage: true,
+    type: 'streamlit:componentReady',
+    apiVersion: 1,
+  }, '*');
+}
+function setFrameHeight(h) {
+  window.parent.postMessage({
+    isStreamlitMessage: true,
+    type: 'streamlit:setFrameHeight',
+    height: h,
+  }, '*');
+}
+function sendValue(value) {
+  window.parent.postMessage({
+    isStreamlitMessage: true,
+    type: 'streamlit:setComponentValue',
+    value: value,
+    dataType: 'json',
+  }, '*');
+}
+// Report the current time step back to Python (drives all charts/KPIs).
+// `v` echoes the loaded frames version so Python knows the payload was received
+// and can stop re-sending the heavy frames data.
+function reportTime() {
+  sendValue({ t: currentT, selected: null, v: loadedVersion,
+              show3d: show3d, metric: columnMode });
+}
+
+window.addEventListener('message', e => {
+  if (e.data && e.data.type === 'streamlit:render') handleRender(e.data.args || {});
+});
+
+// ── Render handler ─────────────────────────────────────────────────────────
+function handleRender(args) {
+  const firstRender = !deckInst;
+
+  // Heavy payloads (frames / static / signals) are only sent by Python when the
+  // filter/scenario version changes; on plain clock-reruns they arrive as null,
+  // and we simply keep what we already have.
+  let framesLoaded = false;
+  if (args.frames_compact) {
+    const fc = args.frames_compact;
+    positions = fc.positions.map(a => new Float32Array(a));
+    colors    = fc.colors.map(a => new Uint8Array(a));
+    vMeta     = fc.meta;
+    document.getElementById('slider').max = (positions.length - 1) || 95;
+    loadedVersion = args.version || null;
+    framesLoaded = true;
+  }
+  if (args.static)          staticData = args.static;
+  if (args.signal_pos)      signalPos  = args.signal_pos;
+  if (args.signal_colors)   signalCols = args.signal_colors.map(a => a);
+  if (args.column_pos)      columnPos     = args.column_pos;
+  if (args.column_colors)   columnColors  = args.column_colors;
+  if (args.column_names)    columnNames   = args.column_names;
+  if (args.column_elev_dem) columnElevDem = args.column_elev_dem;
+  if (args.column_elev_occ) columnElevOcc = args.column_elev_occ;
+  if (typeof args.column_scale_dem === 'number') columnScaleDem = args.column_scale_dem;
+  if (typeof args.column_scale_occ === 'number') columnScaleOcc = args.column_scale_occ;
+
+  if (firstRender) {
+    if (typeof args.initialT === 'number') currentT = args.initialT;
+    if (typeof args.playing  === 'boolean') playing  = args.playing;
+    initDeck();
+    if (playing) startAnim(); else stopAnim();
+  } else {
+    updateLayers();
+  }
+  updateUI();
+
+  // Acknowledge receipt immediately (even while paused) so Python stops
+  // re-sending the heavy frames payload for this version.
+  if (framesLoaded) reportTime();
+}
+
+// ── SoC colour → label ──────────────────────────────────────────────────────
+function socLabel(r, g, b) {
+  if (r > 180 && g < 80)  return { label:'Critical < 20%',  bg:'#DC2626' };
+  if (r > 180 && g > 100) return { label:'Caution 20–50%',  bg:'#F59E0B' };
+  if (b > 180 && r < 100) return { label:'Normal 50–80%',   bg:'#3B82F6' };
+  return                         { label:'High > 80%',      bg:'#16A34A' };
+}
+
+// ── Vehicle info panel ──────────────────────────────────────────────────────
+function showVInfo(obj) {
+  const panel = document.getElementById('vinfo');
+  const col   = colors[currentT] || [];
+  const idx = vMeta.findIndex(m => m.vid === obj.vid && m.trip_class === obj.trip_class);
+  const r = idx >= 0 ? col[idx*4]   : obj.fill_color[0];
+  const g = idx >= 0 ? col[idx*4+1] : obj.fill_color[1];
+  const b = idx >= 0 ? col[idx*4+2] : obj.fill_color[2];
+  const soc = socLabel(r, g, b);
+
+  document.getElementById('vinfo-title').textContent =
+    (obj.trip_class === 2 ? '2-trip' : '4-trip') + ' · Vehicle ' + obj.vid;
+  const socEl = document.getElementById('vinfo-soc');
+  socEl.textContent = soc.label;
+  socEl.style.background = soc.bg;
+  document.getElementById('vinfo-body').innerHTML =
+    'Time: <b>' + (TIME_LABELS[currentT] || '00:00') + '</b><br>' +
+    'Profile: <b>' + ((obj.tooltip.split('|')[1] || '—').trim()) + '</b>';
+  panel.style.display = 'block';
+}
+document.getElementById('vinfo-close').addEventListener('click', () => {
+  document.getElementById('vinfo').style.display = 'none';
+});
+
+// ── Build vehicle data for the current frame ────────────────────────────────
+function buildVehicleData() {
+  if (!positions.length) return [];
+  const pos = positions[currentT];
+  const col = colors[currentT];
+  const out = [];
+  for (let i = 0; i < vMeta.length; i++) {
+    if (col[i*4+3] === 0) continue;   // filtered-out → transparent → skip
+    out.push({
+      position:   [pos[i*2], pos[i*2+1]],
+      fill_color: [col[i*4], col[i*4+1], col[i*4+2], col[i*4+3]],
+      vid:        vMeta[i].vid,
+      trip_class: vMeta[i].trip_class,
+      tooltip:    vMeta[i].tooltip,
+    });
+  }
+  return out;
+}
+
+// ── Zone flex/demand traffic-light signal ───────────────────────────────────
+function buildZoneSignalData() {
+  if (!signalPos.length) return [];
+  const col = signalCols[currentT] || [];
+  return signalPos.map((pos, i) => ({
+    position:   pos,
+    fill_color: [col[i*4], col[i*4+1], col[i*4+2], col[i*4+3]],
+  }));
+}
+
+// ── 3D demand/occupancy columns ─────────────────────────────────────────────
+function buildColumnData() {
+  return columnPos.map((p, i) => ({
+    position: p,
+    color:    columnColors[i],
+    idx:      i,
+    tooltip:  columnNames[i] + (columnMode === 'occ' ? ' — vehicles' : ' — charging demand'),
+  }));
+}
+
+// ── Layers ───────────────────────────────────────────────────────────────────
+function buildLayers() {
+  const layers = [];
+  if (staticData) {
+    if (staticData.neigh && staticData.neigh.length)
+      layers.push(new PolygonLayer({
+        id:'neigh', data:staticData.neigh,
+        getPolygon:d=>d.polygon, getFillColor:d=>d.fill_color,
+        stroked:false, pickable:false,
+      }));
+    if (staticData.bld && staticData.bld.length)
+      layers.push(new PolygonLayer({
+        id:'bld', data:staticData.bld,
+        getPolygon:d=>d.polygon, getFillColor:d=>d.fill_color,
+        stroked:false, pickable:false,
+      }));
+    if (staticData.bld_pts && staticData.bld_pts.length)
+      layers.push(new ScatterplotLayer({
+        id:'bld_pts', data:staticData.bld_pts,
+        getPosition:d=>d.position, getRadius:6, radiusMinPixels:2,
+        getFillColor:d=>d.fill_color, stroked:false, pickable:false,
+      }));
+  }
+  if (signalPos.length)
+    layers.push(new ScatterplotLayer({
+      id:'zone_signal', data:buildZoneSignalData(),
+      getPosition:d=>d.position, getRadius:90, radiusMinPixels:14,
+      getFillColor:d=>d.fill_color, getLineColor:[255,255,255,220],
+      lineWidthMinPixels:2, stroked:true, pickable:false,
+      updateTriggers:{ getFillColor: currentT },
+    }));
+  if (show3d && columnPos.length)
+    layers.push(new ColumnLayer({
+      id:'demand_columns', data:buildColumnData(),
+      diskResolution:20, radius:110, extruded:true,
+      elevationScale:(columnMode === 'occ' ? columnScaleOcc : columnScaleDem),
+      getPosition:  d => d.position,
+      getFillColor: d => [d.color[0], d.color[1], d.color[2], 200],
+      getElevation: d => (((columnMode === 'occ' ? columnElevOcc : columnElevDem)[currentT] || [])[d.idx] || 0),
+      updateTriggers:{ getElevation: currentT + ':' + columnMode, elevationScale: columnMode },
+      pickable:true,
+    }));
+  layers.push(new ScatterplotLayer({
+    id:'vehicles', data:buildVehicleData(),
+    getPosition:d=>d.position, getRadius:30, radiusMinPixels:5,
+    getFillColor:d=>d.fill_color, getLineColor:[255,255,255,180],
+    lineWidthMinPixels:1, stroked:true, pickable:true,
+    autoHighlight:true, highlightColor:[255,255,255,80],
+    updateTriggers:{ getPosition:currentT, getFillColor:currentT },
+    onClick: info => {
+      if (info.object) {
+        stopAnim();
+        showVInfo(info.object);
+        sendValue({ t: currentT, v: loadedVersion,
+                    selected: { trip_class: info.object.trip_class, vid: info.object.vid } });
+      }
+    },
+  }));
+  return layers;
+}
+
+// ── Deck init ────────────────────────────────────────────────────────────────
+function initDeck() {
+  deckInst = new DeckGL({
+    parent: document.getElementById('deck-container'),
+    mapStyle: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+    maplibregl: maplibregl,
+    initialViewState: { latitude:45.9540, longitude:15.4950, zoom:12.2, pitch:0, bearing:0 },
+    controller: {
+      scrollZoom: true, doubleClickZoom: true, dragPan: true,
+      dragRotate: false, touchRotate: false, keyboard: true,
+    },
+    layers: buildLayers(),
+    getTooltip: ({object}) => object && {
+      html: object.tooltip,
+      style: { backgroundColor:'#1E293B', color:'white', fontSize:'12px',
+               padding:'6px 10px', borderRadius:'6px' },
+    },
+  });
+  const canvas = document.querySelector('#deck-container canvas');
+  if (canvas) canvas.addEventListener('wheel', e => e.stopPropagation(), { passive:false });
+  enableScrollZoom();
+}
+
+function enableScrollZoom() {
+  try {
+    const mlMap = deckInst && deckInst.getMapboxMap();
+    if (mlMap && mlMap.scrollZoom) { mlMap.scrollZoom.enable(); return; }
+  } catch(e) {}
+  setTimeout(enableScrollZoom, 500);
+}
+
+function updateLayers() {
+  if (deckInst) deckInst.setProps({ layers: buildLayers() });
+}
+
+// ── Animation ─────────────────────────────────────────────────────────────────
+function startAnim() {
+  if (animTimer) return;
+  playing = true;
+  animTimer = setInterval(() => {
+    if (!positions.length) return;
+    currentT = (currentT + 1) % positions.length;
+    updateLayers(); updateUI();
+    reportTime();          // ← push the new time step to Python
+  }, STEP_MS);
+  document.getElementById('playBtn').textContent = '⏸';
+}
+function stopAnim() {
+  if (animTimer) { clearInterval(animTimer); animTimer = null; }
+  playing = false;
+  document.getElementById('playBtn').textContent = '▶';
+}
+
+function updateUI() {
+  document.getElementById('slider').value = currentT;
+  document.getElementById('timeLabel').textContent = TIME_LABELS[currentT] || '00:00';
+  document.getElementById('countLabel').textContent =
+    vMeta.length ? vMeta.length + ' vehicles' : '';
+}
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (playing) stopAnim(); else startAnim();
+});
+document.getElementById('slider').addEventListener('input', e => {
+  stopAnim();
+  currentT = parseInt(e.target.value, 10);
+  updateLayers(); updateUI();
+  reportTime();            // scrubbing also drives the charts
+});
+
+// ── 3D column controls ──────────────────────────────────────────────────────
+function applyPitch() {
+  try {
+    const m = deckInst && deckInst.getMapboxMap();
+    if (m) m.easeTo({ pitch: show3d ? 45 : 0, bearing: show3d ? -15 : 0, duration: 400 });
+  } catch (e) {}
+}
+document.getElementById('threeDBtn').addEventListener('click', () => {
+  show3d = !show3d;
+  document.getElementById('threeDBtn').textContent = show3d ? '3D: on' : '3D: off';
+  document.getElementById('colBtn').style.display = show3d ? 'inline-block' : 'none';
+  applyPitch();
+  updateLayers();
+  reportTime();            // tell Python so the explanation card appears/hides
+});
+document.getElementById('colBtn').addEventListener('click', () => {
+  columnMode = (columnMode === 'occ') ? 'dem' : 'occ';
+  document.getElementById('colBtn').textContent =
+    (columnMode === 'occ') ? 'Occupancy' : 'Demand';
+  updateLayers();
+  reportTime();
+});
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+setFrameHeight(430);
+sendReady();
+</script>
+</body>
+</html>

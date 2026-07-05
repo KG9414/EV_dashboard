@@ -1,0 +1,10 @@
+# Used only when (re)building the OSM cache or running the research pipeline.
+# The deployed Streamlit app does NOT need these.
+
+-r requirements.txt
+osmnx>=1.9
+geopandas>=0.14
+shapely>=2.0
+contextily>=1.5
+scipy>=1.11
+matplotlib>=3.7

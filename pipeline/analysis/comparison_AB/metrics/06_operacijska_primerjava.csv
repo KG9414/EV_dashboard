@@ -1,0 +1,3 @@
+model,metoda_destinacij,casovna_zamuda,deps_api,profili,day_types,validator_verig
+A (Original),ORS isochrone API,time.sleep(5) / klic,Da (ORS),Ne,2,Ne
+B (Pipeline),Haversine ring + gravitacijski model,brez API zamude,Ne (OSM lokalno),Da (Commuter/Retired/Noncommuter),5,Da

@@ -1,0 +1,48 @@
+# Comparison A vs B — run configuration
+# Generated: 2026-06-15
+
+primary:
+  N: 25
+  trips: 4
+  days: 1
+  day_type: Workday
+  R: 1   # single run per model — no variance estimate available
+
+secondary:
+  # Used only for activity-type and departure-time analysis
+  N_A: 100   # A Step1 at 100 EVs, 4 trips
+  N_B: 100   # B Step3 at 100 EVs, 2 trips
+  note: "trips differ (A=4, B=2) at N=100 — noted in report"
+
+sources:
+  A_step1_root: "/Users/karlagliha/Documents/Documents/Faks/Magisterij/OneDrive_1_2-25-2026"
+  B_pipeline:   "pipeline"  # relative to repo root
+  nhts_data:    "pipeline/00_NHTS_data.csv"
+
+files:
+  # Primary config (N=25, trips=4)
+  A_step3_25_4:  "{A_step1_root}/03_Vehicle_parameters/03_Vehicle_trip_parameters_25_EVs_4_trips_1_days.xlsx"
+  A_step2_25_4:  "{A_step1_root}/02_Trips/02_Trips_25_EVs_4_trips_1_days.xlsx"
+  B_step3_25_4:  "{B_pipeline}/03_Vehicle_parameters/03_Vehicle_trip_parameters_25_EVs_4_trips_1_days.xlsx"
+
+  # Secondary (N=100)
+  A_step1_100_4: "{A_step1_root}/01_Trips_parameters_100_EVs_4_trips_1_days.xlsx"
+  B_step3_100_2: "{B_pipeline}/03_Vehicle_parameters/03_Vehicle_trip_parameters_100_EVs_2_trips_1_days.xlsx"
+
+cities:
+  A: "Velenje"
+  B: "Krško"
+
+energy_impute_kwh_per_km: 0.18  # used for A (no energy column)
+
+statistical_note: >
+  Both models are single-run (R=1). No confidence intervals are computed.
+  Point estimates only. Variance/CI analysis requires re-running models
+  with controlled seeds, which was not feasible (A: ORS API dependency;
+  B: OSM + routing overhead).
+
+limitations:
+  - "A run in Velenje, B run in Krško — spatial metrics not directly comparable"
+  - "A uses ORS isochrone API for destinations; B uses Haversine ring + gravity model"
+  - "No ground truth for either city"
+  - "R=1: estimates may not be representative of model distributions"

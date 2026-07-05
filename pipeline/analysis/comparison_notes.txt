@@ -1,0 +1,35 @@
+COMPARISON NOTES
+============================================================
+
+Data sources used:
+  Baseline file:  01_Trips_parameters_100_EVs_4_trips_7_days.xlsx  shape=(2800, 7)
+  Pipeline file:  01_Trips_parameters_1344_EVs_2_trips_1_days.xlsx  shape=(2688, 8)
+
+
+ComparisonAB folder findings:
+  Location: /Users/karlagliha/.../DomCenter/analysis/comparison_AB/
+  Already present: full A-vs-B comparison with 20+ figures and 8 metric CSV files.
+  The existing ComparisonAB compares Model A (Velenje, NHTS, no demographics)
+  vs Model B (Krško, DomCenter pipeline, with Commuter/Retired/Nonccommuter profiles).
+  Key metrics already computed: KS tests, Wasserstein distances, JSD for trip types,
+  spatial property differences, and chain validity rates.
+  The current figure (comparison_baseline_vs_upgraded.png) adds four standalone panels
+  readable for a thesis chapter without assuming prior knowledge of the ComparisonAB report.
+
+
+Panel status:
+  Panel 1: OK
+  Panel 2: OK
+  Panel 3: OK
+  Panel 4: OK (hardcoded demographic data, no file reading needed)
+
+
+Data compatibility notes:
+  Panel 1 (departure): baseline Start column = 'Start', pipeline = 'Start'.
+  Interval-to-hour conversion applied where max value > 24.
+
+
+What the graphs show about the upgrade:
+  Panel 1 reveals a structurally different departure-time profile: the upgraded model shows a clear 7–9 AM morning peak driven by the Commuter profile constraint, while the NHTS baseline distributes departures more uniformly across the day (KS statistic 0.36, Wasserstein distance 3.45 h from the ComparisonAB report).
+  Panel 2 demonstrates that the upgraded model produces a more realistic trip-type mix: the enforced profile system increases Work trip share for Commuters and raises Leisure share for Retired/Nonccommuter profiles, compared to the unconstrained stochastic Markov sampling in the baseline (JSD = 0.27 at N=100, χ² p < 0.001).
+  Panel 4 is the key structural difference: the baseline assumes US population proportions (Commuter 60 %, Retired 25 %, Other 15 %), while the upgraded model uses Krško SiStat 2025 data (Commuter 44.9 %, Retired 21.6 %, Nonccommuter 33.5 %), reflecting a larger non-employed but active population — a meaningful adaptation for Slovenian municipality modelling.

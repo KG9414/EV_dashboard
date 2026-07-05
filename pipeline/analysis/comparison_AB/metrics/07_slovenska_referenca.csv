@@ -1,0 +1,10 @@
+indikator,vrednost,enota,vir,leto,zanesljivost
+Modalni delež OS (SI),86.1,%,Eurostat tran_hv_psmod,2022,direktno
+Modalni delež OS (EU27),83.6,%,Eurostat tran_hv_psmod,2022,direktno
+VKM osebnih avtomobilov (SI),16801.0,mio km,Eurostat road_tf_vehmov,2022,direktno
+Povp. razdalja/potovanje SI (ocena),6.8,km,Izpeljano: Eurostat VKM / SURS pop / 3.2 pot/dan,2022,izpeljano (~±20%)
+NHTS mean razdalja (ZDA),13.12,km,NHTS 2017 (US DOT),2017,tuja referenca
+NHTS median razdalja (ZDA),5.94,km,NHTS 2017 (US DOT),2017,tuja referenca
+Model A mean (Velenje),15.8,km,"Simulacija A, N=25",2025,model
+Model B mean (Krško),13.2,km,"Simulacija B, N=25",2025,model
+Model B mean (Velenje),5.0,km,"Simulacija B@Velenje, N=25",2025,model

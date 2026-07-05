@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 12pt;
+    line-height: 1.5;
+    max-width: 700px;
+    margin: 60px auto;
+    color: #000;
+  }
+  h1 {
+    font-size: 16pt;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  h2 {
+    font-size: 14pt;
+    font-weight: bold;
+    margin-top: 28px;
+    margin-bottom: 6px;
+  }
+  h3 {
+    font-size: 12pt;
+    font-weight: bold;
+    margin-top: 16px;
+    margin-bottom: 4px;
+  }
+  ul {
+    margin: 4px 0 10px 0;
+    padding-left: 24px;
+  }
+  li {
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    text-align: center;
+    font-style: italic;
+    color: #555;
+    margin-bottom: 40px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Kazalo vsebine</h1>
+<p class="subtitle">Magistrska naloga – V2G mobilnostni model za občino Krško</p>
+
+<!-- ===== 1. UVOD ===== -->
+<h2>1. Uvod</h2>
+
+<h3>1.1 Motivacija in ozadje</h3>
+<ul>
+  <li>Električna vozila postajajo vse bolj dostopna, hkrati pa njihov vpliv na elektroenergetsko omrežje ostaja slabo razumljen na lokalni ravni.</li>
+  <li>Tehnologija V2G (vehicle-to-grid) ponuja možnost, da bi vozila namesto pasivnih porabnikov postala aktivni udeleženci v upravljanju omrežja.</li>
+  <li>Obstoječe ocene potenciala V2G večinoma temeljijo na agregatnih podatkih – ta naloga išče pristop, ki deluje na ravni posameznega vozila in posamezne občine.</li>
+</ul>
+
+<h3>1.2 Opredelitev problema in raziskovalna vprašanja</h3>
+<ul>
+  <li>Osrednje vprašanje je, kako izmeriti prožnost, ki jo flota EV v neki občini dejansko ponuja – ne le teoretično, ampak ob realnih mobilnostnih vzorcih.</li>
+  <li>Podatki o mobilnosti so razpršeni in redko prilagojeni za simulacijo na ravni posameznega vozila; naloga preverja, ali je to mogoče z javno dostopnimi viri.</li>
+  <li>Postavila sem tri konkretna raziskovalna vprašanja: o merljivosti prožnosti, o vlogi odprtih podatkov in o prenosljivosti metodologije na druge občine.</li>
+</ul>
+
+<h3>1.3 Cilji in prispevki naloge</h3>
+<ul>
+  <li>Razviti simulacijski model, ki za vsako vozilo posebej sledi mobilnosti in stanju napolnjenosti baterije čez celoten dan.</li>
+  <li>Kvantificirati prožnost, ki jo agregatna flota ponuja elektroenergetskemu sistemu, v obliki konkretnih številk.</li>
+  <li>Pokazati, da je tak pristop mogoč brez dragih komercialnih orodij – izključno z odprtokodnimi knjižnicami in javnimi podatki.</li>
+</ul>
+
+<h3>1.4 Študija primera: občina Krško</h3>
+<ul>
+  <li>Krško ima registriranih ~16.803 vozil, od tega okrog 6 % električnih – dovolj za smiselno analizo, a dovolj majhno, da je model pregleden.</li>
+  <li>Lokalna demografska in prostorska struktura sta dobro dokumentirani, kar omogoča realistično kalibracijo modela.</li>
+  <li>Krško ni le primer sam po sebi – gre za demonstracijo metodologije, ki jo je mogoče prenesti na katero koli slovensko občino z javnimi podatki.</li>
+</ul>
+
+<h3>1.5 Struktura naloge</h3>
+<ul>
+  <li>Naloga sledi logičnemu toku: od teoretičnega ozadja prek metodologije do rezultatov in razprave.</li>
+  <li>Vsako poglavje je sklenjeno samo po sebi, a skupaj tvorijo celoten argument za smiselnost predlaganega pristopa.</li>
+  <li>Vizualizacija ni le dodana vrednost – je sestavni del analize in je obravnavana kot samostojno poglavje.</li>
+</ul>
+
+
+<!-- ===== 2. TEORETIČNE OSNOVE ===== -->
+<h2>2. Teoretične osnove</h2>
+
+<h3>2.1 Tehnologiji V2G in G2V</h3>
+<ul>
+  <li>G2V (grid-to-vehicle) je klasično polnjenje: omrežje polni baterijo. V2G pa gre v obe smeri – polno napolnjeno vozilo lahko energijo tudi oddaja nazaj.</li>
+  <li>V2G ni zgolj tehnična možnost, ampak sistemska storitev: agregatna flota vozil lahko nadomesti del regulacijske rezerve v omrežju.</li>
+  <li>Obe tehnologiji zahtevata pametno polnilno infrastrukturo in usklajevanje – sam avto ni dovolj, potreben je celoten ekosistem.</li>
+</ul>
+
+<h3>2.2 Prožnost flote električnih vozil</h3>
+<ul>
+  <li>Prožnost pomeni sposobnost prilagajanja porabe ali oddaje energije glede na signal iz omrežja – in to v realnem času.</li>
+  <li>Ločimo pozitivno prožnost (vozila oddajajo energijo) in negativno (polnjenje se zmanjša ali prestavi na ugodnejši čas).</li>
+  <li>Prožnost ni na voljo ves čas – je le takrat, ko je vozilo priključeno in ima dovolj napolnjeno baterijo. Mobilnostni vzorci to neposredno določajo.</li>
+</ul>
+
+<h3>2.3 Modeliranje mobilnosti in generiranje poti</h3>
+<ul>
+  <li>Mobilnostni model opisuje, kdaj in kam gredo vozila čez dan – to je izhodišče za vsako smiselno oceno prožnosti.</li>
+  <li>Markovske verige in gravitacijski model sta formalni orodji, ki to obnašanje matematično opišeta na podlagi statističnih podatkov.</li>
+  <li>Demografski profil voznika (komutant, upokojenec, ostalo) ključno vpliva na to, kdaj vozilo zapusti dom in kdaj se vrne.</li>
+</ul>
+
+<h3>2.4 Teorija verižnih poti in prostorsko-časovni modeli</h3>
+<ul>
+  <li>Teorija verižnih poti (trip chain theory) izhaja iz opažanja, da ljudje redko opravijo eno izolirana pot – vsakodnevna mobilnost je zaporedje medsebojno pogojenih poti (dom → služba → nakup → dom).</li>
+  <li>Prostorsko-časovni modeli (space-time models) opisujejo gibanje posameznika skozi prostor in čas hkrati: kdaj je kje, kako dolgo ostane in kaj ga v gibanju omejuje (Hägerstrand, 1970).</li>
+  <li>Oba koncepta skupaj postavljata okvir za realističen model mobilnosti EV: vozilo ni samo "en odhod in en prihod", ampak celodnevna pot z omejitvami časa in prostora.</li>
+  <li>V nalogi se ta izhodišča odražajo v strukturi cevovoda: generiranje poti ne temelji na izoliranih poteh, ampak na celodnevnih zaporedjih, ki so prostorsko in časovno konsistentna.</li>
+</ul>
+
+<h3>2.6 Dinamika stanja napolnjenosti (SoC)</h3>
+<ul>
+  <li>SoC (State of Charge) je v vsakem trenutku ključna spremenljivka: pove, koliko energije je v bateriji in koliko je je na voljo za morebitno oddajo.</li>
+  <li>Med vožnjo SoC pada glede na razdaljo in porabo; med polnjenjem narašča glede na moč polnilnika.</li>
+  <li>V praksi baterije niso polnjene do 100 % in ne praznene do 0 % – varnostne meje (npr. 20–90 %) so del vsakega realističnega modela.</li>
+</ul>
+
+<h3>2.7 Pregled obstoječih orodij</h3>
+<ul>
+  <li>EPIOT in PFM sta akademska modela za oceno potenciala V2G, razvita za nacionalno ali regionalno raven z agregatnimi podatki.</li>
+  <li>DomCenter se razlikuje v dveh pogledih: deluje na ravni posameznega vozila in je neposredno prilagojen za občinsko vizualizacijo.</li>
+  <li>Namen primerjave ni tekmovanje, ampak jasna umestitev: kateri tip vprašanj rešuje kateri pristop.</li>
+</ul>
+
+<h3>2.8 Viri odprtih podatkov</h3>
+<ul>
+  <li>OpenStreetMap (OSM) zagotavlja prostorsko strukturo: ceste, rabo tal, točke interesa – vse brez licenčnih omejitev.</li>
+  <li>Statistični urad (SURS / SiStat) ponuja demografske podatke za kalibriranje profilov voznikov in mobilnostnih vzorcev.</li>
+  <li>Ameriška anketa o potovanjih (NHTS) dopolnjuje sliko o dnevnih vzorcih mobilnosti tam, kjer domači podatki niso dovolj granularni.</li>
+</ul>
+
+
+<!-- ===== 3. METODOLOGIJA ===== -->
+<h2>3. Metodologija</h2>
+
+<h3>3.1 Pregled simulacijskega cevovoda</h3>
+<ul>
+  <li>Pipeline se razdeli na pet zaporednih korakov (Step_0 do Step_4): vsak gradi na izhodu prejšnjega, kar olajša testiranje in odpravljanje napak.</li>
+  <li>Vhod so demografski podatki in prostorska mreža občine; izhod so urne krivulje SoC in prožnosti za celotno floto.</li>
+  <li>Modularnost je zavestna odločitev: posamezni korak je mogoče zamenjati ali nadgraditi brez poseganja v celotno verigo.</li>
+</ul>
+
+<h3>3.2 Vhodni podatki in demografsko uteževanje</h3>
+<ul>
+  <li>Vsako simulirano vozilo dobi demografski profil, ki določa verjetne vzorce odhajanja in vračanja domov.</li>
+  <li>Demografske uteži izhajajo iz popisa: komutant (44,9 %), upokojenec (21,6 %), ostalo (33,5 %).</li>
+  <li>Prehodne matrike določajo, s kakšno verjetnostjo bo vozilo ob danem času na poti ali priključeno na polnilnik.</li>
+</ul>
+
+<h3>3.3 Generiranje poti in dodelitev vozil</h3>
+<ul>
+  <li>Za vsako vozilo se generira realistično zaporedje poti za en dan: odhod od doma, destinacija, čas, vrnitev.</li>
+  <li>Dva scenarija glede obsega mobilnosti: dve poti na dan (2T) ali štiri poti na dan (4T), vsak z drugačnim profilom obremenjenosti polnilnika.</li>
+  <li>Razlika med scenariji neposredno vpliva na razpoložljivo prožnost – vozilo, ki naredi štiri poti, ima manj časa za polnjenje in oddajanje.</li>
+</ul>
+
+<h3>3.4 Določanje lokacij in usmerjanje</h3>
+<ul>
+  <li>Za vsako pot se na osnovi OSM poišče realna destinacija – ne naključna točka, ampak dejanska raba tal (delo, nakupovalni center, dom).</li>
+  <li>API klici vrnejo razdalje in čase vožnje po cestnem omrežju, kar omogoča natančnejšo oceno porabe energije.</li>
+  <li>Izohroni (dostopnost v X minutah) omejijo, katere lokacije so za posameznega voznika sploh smiselne – in s tem izboljšajo realističnost modela.</li>
+</ul>
+
+<h3>3.5 Simulacija dinamike SoC</h3>
+<ul>
+  <li>SoC se računa v 15-minutnih intervalih za vsako vozilo posebej – dovolj granularno, da ujamemo kratke poti in krajevna polnjenja.</li>
+  <li>Med vožnjo se energija odvzame glede na razdaljo in povprečno porabo; med mirovanjem pri polnilniku se postopoma dodaja.</li>
+  <li>Rezultat je krivulja SoC čez dan za vsakega od ~824 simuliranih vozil – skupaj tvorijo agregatni profil flote.</li>
+</ul>
+
+<h3>3.6 Kvantifikacija prožnosti</h3>
+<ul>
+  <li>Prožnost izračunamo kot vsoto razpoložljive energije vseh vozil, ki so v danem trenutku priključena in znotraj varnih meja SoC.</li>
+  <li>Ločimo pozitivno prožnost (vozila bi lahko oddajala) in negativno (polnjenje bi se dalo odložiti ali zmanjšati).</li>
+  <li>Rezultat je časovna vrsta prožnosti za celotno floto – pokazatelj tega, kdaj in koliko fleksibilnosti sistem dejansko ponuja.</li>
+</ul>
+
+<h3>3.7 Modelske predpostavke in robni pogoji</h3>
+<ul>
+  <li>Model predpostavlja fiksne tehnične parametre: povprečno porabo, moč polnilnika, kapaciteto baterije. V praksi se ti razlikujejo od vozila do vozila.</li>
+  <li>SoC ne sme pasti pod 20 % ali preseči 90 % – to sta varnostni meji, ki sta v V2G sistemih standardna.</li>
+  <li>Koeficienta α in β uravnavata, kolikšen del razpoložljive energije se dejansko ponudi: model je s tem mogoče kalibrirati brez spremembe osnovne logike.</li>
+</ul>
+
+<h3>3.8 Prostorska klasifikacija con</h3>
+<ul>
+  <li>Vsaka destinacija v modelu dobi prostorski tip (dom, delo, nakupovalni center, zdravstvo...) na osnovi OSM podatkov o rabi tal.</li>
+  <li>Prostorski spoj poveže vsako pot z njeno lokacijo in tipom cone, kar omogoča kasnejše prostorske analize prožnosti.</li>
+  <li>Klasifikacija ni trivialna: OSM pokritost za Krško je delna, zato je bil del dela ročna validacija in dopolnjevanje.</li>
+</ul>
+
+
+<!-- ===== 4. VIZUALIZACIJA ===== -->
+<h2>4. Vizualizacija</h2>
+
+<h3>4.1 Prototip v okolju Matplotlib</h3>
+<ul>
+  <li>Prva implementacija je sledila le štirim vozilom v statičnih grafih – dovolj, da preverimo, ali logika simulacije sploh daje smiselne rezultate.</li>
+  <li>Animacija mobilnosti je pokazala, kdaj so vozila na poti, kdaj doma pri polnilniku in kako se SoC temu prilagaja.</li>
+  <li>Prototip je bil namerno minimalen: namen ni bil lep prikaz, ampak hiter dokaz koncepta pred gradnjo večjega sistema.</li>
+</ul>
+
+<h3>4.2 Prostorski prikaz gostote mobilnosti</h3>
+<ul>
+  <li>Toplotna karta prikaže, kje v občini se mobilnost koncentrira – kateri predeli so prometno najbolj obremenjeni in kje je polnjenje najpogostejše.</li>
+  <li>Vsaka točka na karti odraža dejansko destinacijo ali lokacijo vozila v modelu, ne interpolirane vrednosti.</li>
+  <li>Kontekstualna podloga (contextily) doda geografske reference: ceste, naselja in meje, ki naredijo karto berljivo za ne-tehničnega bralca.</li>
+</ul>
+
+<h3>4.3 Spletna aplikacija DomCenter</h3>
+<ul>
+  <li>Streamlit aplikacija je namenjena interaktivnemu pregledu mobilnosti in prožnosti na ravni občine – brez potrebe po programerskem znanju.</li>
+  <li>Vključuje več pogledov: karta z lokacijami vozil, krivulje SoC, histogram prihodov in odhodov ter grafi prožnosti.</li>
+  <li>Vmesnik je zasnovan za odločevalce in načrtovalce, ne le za tehnike: poudarek je na jasnosti in razlagalnih zmožnostih.</li>
+</ul>
+
+<h3>4.4 Razvoj in nadgradnje vizualizacije</h3>
+<ul>
+  <li>Vizualizacija je nastajala postopoma: vsaka nova funkcija je bila motivirana z realnim vprašanjem ali omejitev prejšnje verzije.</li>
+  <li>Prehod od Matplotlib protitipa k Streamlit aplikaciji je sledil premiku od "preveriti, ali deluje" k "pokazati, kaj pomeni".</li>
+  <li>Vizualizacija ni le ilustracija rezultatov – v tem projektu je bila aktivni del razumevanja in interpretacije podatkov.</li>
+</ul>
+
+<h3>4.5 Prikaz prožnosti</h3>
+<ul>
+  <li>Krivulje prožnosti so osrednji vizualni izhod naloge: kažejo, kdaj in koliko energije bi flota lahko oddala ali zadržala.</li>
+  <li>Časovne serije so prikazane za posamezne scenarije (Tier 1/2/3), kar omogoča neposredno primerjavo med stopnjami penetracije.</li>
+  <li>Vizualni prikaz naredi abstraktne številke berljive: vrh prožnosti ob 18:00 je v grafu takoj opazen, v tabeli pa ne.</li>
+</ul>
+
+
+<!-- ===== 5. REZULTATI ===== -->
+<h2>5. Rezultati</h2>
+
+<h3>5.1 Validacijski primer</h3>
+<ul>
+  <li>Pred skaliranjem na ~824 vozil je model preverjen na 1–5 vozilih z ročno kontrolo vsakega koraka.</li>
+  <li>SoC mora slediti pričakovanemu obnašanju: padati med vožnjo, naraščati pri polnjenju, ostati znotraj varnostnih meja.</li>
+  <li>Validacija potrdi, da osnovna logika deluje pravilno – in da se morebitne napake ne skrijejo v agregatu večje flote.</li>
+</ul>
+
+<h3>5.2 Dinamika stanja napolnjenosti</h3>
+<ul>
+  <li>Krivulje SoC za posamezna vozila kažejo raznolikost: eno vozilo gre zgodaj v službo, drugo ostane doma do popoldneva.</li>
+  <li>Agregatna krivulja flote razkrije skupni dnevni vzorec: zjutraj padec, dopoldne stabilizacija, popoldne postopno polnjenje.</li>
+  <li>Najnižja točka skupnega SoC flote je kritičen trenutek – takrat je prožnost najmanjša in obremenitev omrežja največja.</li>
+</ul>
+
+<h3>5.3 Pozitivna in negativna prožnost</h3>
+<ul>
+  <li>Pozitivna prožnost je največja zvečer, ko se večina vozil vrne domov in je priključena – tedaj bi flota lahko oddajala nazaj v omrežje.</li>
+  <li>Negativna prožnost (zmožnost odloga polnjenja) je prav tako zvečer največja: vozila polnijo, a bi polnjenje brez škode odložila.</li>
+  <li>Oba profila skupaj tvorita jasen dnevni vzorec, ki je neposredno koristen za načrtovanje upravljanja omrežja.</li>
+</ul>
+
+<h3>5.4 Rezultati po scenarijih</h3>
+<ul>
+  <li>Trije scenariji (Tier 1, 2, 3) odražajo različne stopnje penetracije EV – od trenutnega stanja do ambicioznih prihodnjih ciljev.</li>
+  <li>Višja penetracija poveča agregirano prožnost, a hkrati poveča koničarsko povpraševanje po elektriki in obremenitev omrežja.</li>
+  <li>Primerjava scenarijev pokaže, kako se razmerje med prožnostjo in obremenitvijo omrežja premika z rastjo flote.</li>
+</ul>
+
+<h3>5.5 Vizualni prikaz rezultatov</h3>
+<ul>
+  <li>Karte, grafi in tabele iz DomCenter aplikacije so prikazani neposredno – ne le opisani, ampak priloženi kot slike in posnetki zaslona.</li>
+  <li>Prostorska karta prožnosti kaže, kateri predeli občine Krško največ prispevajo – to je neposredno uporabno za lociranje polnilne infrastrukture.</li>
+  <li>Vizualizacije so zasnovane tako, da so razumljive brez predznanja: legenda, osi in razlage so del slike, ne le besedila.</li>
+</ul>
+
+<h3>5.6 Validacija modela</h3>
+<ul>
+  <li>Programska validacija preverja, da SoC nikoli ne preseže nastavljenih mej – to velja za vsakega od simuliranih vozil.</li>
+  <li>Primerjava z ročnim izračunom za eno vozilo potrdi, da model vrne enak rezultat kot analitična formula.</li>
+  <li>Validacija ni enkraten korak na začetku, ampak stalna praksa: vsaka nadgradnja modela zahteva ponovitev ključnih preveritev.</li>
+</ul>
+
+
+<!-- ===== 6. RAZPRAVA ===== -->
+<h2>6. Razprava</h2>
+
+<h3>6.1 Interpretacija rezultatov prožnosti</h3>
+<ul>
+  <li>Prožnost je v Krškem skoncentrirana v dveh časovnih blokih: zjutraj pred odhodom v službo in zvečer po vrnitvi.</li>
+  <li>Penetracija EV ima skoraj linearen učinek na agregirano prožnost – vsak dodaten odstotek prinaša sorazmerno večjo fleksibilnost.</li>
+  <li>Dnevni vzorec je stabilen med scenariji, oblika krivulje se ne spremeni bistveno – kar nakazuje, da je model robusten glede na vhodni parameter penetracije.</li>
+</ul>
+
+<h3>6.2 Omejitve modela in podatkov</h3>
+<ul>
+  <li>Mobilnostni podatki (NHTS) izvirajo iz ZDA – prilagoditev za Slovenijo je bila ročna in ne zagotavlja popolne usklajenosti z domačimi vzorci.</li>
+  <li>Model predpostavlja, da je polnilnik doma vedno na voljo, ko vozilo pripelje – v praksi to ne drži za vse enodružinske hiše in stanovanja.</li>
+  <li>OSM pokritost za Krško je mestoma nepopolna: nekatere delovne lokacije ali storitve manjkajo, kar vpliva na prostorsko realističnost poti.</li>
+</ul>
+
+<h3>6.3 Primerjava z obstoječimi orodji</h3>
+<ul>
+  <li>EPIOT in PFM delata na agregatni ravni in sta kalibrirani na večje podatkovne baze; DomCenter simulira vsako vozilo posebej.</li>
+  <li>Prednost DomCenter je prenosljivost in preglednost: odprta koda, javni podatki, vizualizacija prilagojena za lokalne odločevalce.</li>
+  <li>Slabost je manjša statistična robustnost: manj vozil, manj meritev, večji vpliv robnih primerov – to je kompromis zavestne metodološke odločitve.</li>
+</ul>
+
+<h3>6.4 Implikacije za občinsko načrtovanje</h3>
+<ul>
+  <li>Model pokaže, kdaj in kje je prožnost na voljo – to je neposredno koristno za načrtovanje polnilne infrastrukture in upravljanje omrežja.</li>
+  <li>Pristop je prenosljiv: katerakoli občina z javnimi podatki o demografiji in prostorski strukturi ga lahko prilagodi za lastne potrebe.</li>
+  <li>Ob realni penetraciji EV v Krškem je agregatna prožnost že danes merljiva in relevantna – to je argument za zgodnje investicije v pametno polnilno infrastrukturo.</li>
+</ul>
+
+
+<!-- ===== 7. ZAKLJUČEK ===== -->
+<h2>7. Zaključek</h2>
+
+<h3>7.1 Povzetek prispevkov</h3>
+<ul>
+  <li>Razvit je odprtokoden simulacijski cevovod za modeliranje mobilnosti EV flote na ravni posameznega vozila in posamezne občine.</li>
+  <li>Prožnost je kvantificirana z metodo, ki temelji izključno na javnih podatkih in reproducibilni kodi – brez licenciranih komercialnih orodij.</li>
+  <li>DomCenter je operativna vizualizacijska aplikacija, zasnovana za neposredno uporabo v komuniciranju z lokalno upravo.</li>
+</ul>
+
+<h3>7.2 Odgovori na raziskovalna vprašanja</h3>
+<ul>
+  <li>Prožnost flote EV v občini Krško je merljiva z odprtimi podatki: simulacija vrne konkretne številke za agregirano pozitivno in negativno prožnost.</li>
+  <li>Demografski profil in mobilnostni vzorci so ključni dejavniki: brez njiju ocene prožnosti ne odražajo realnih razmer.</li>
+  <li>Metodologija je prenosljiva na druge občine: potrebna sta le javni demografski podatki in OSM pokritost – oba sta dostopna za celotno Slovenijo.</li>
+</ul>
+
+<h3>7.3 Smernice za nadaljnje delo</h3>
+<ul>
+  <li>Ključni tehnični izziv je zamenjava API klica za usmerjanje z lokalnim rešilcem (npr. OSRM), ki ne omejuje obsega simulacije.</li>
+  <li>Model bi bilo smiselno razširiti z realnimi podatki o polnilnikih in vključitvijo različnih tipov polnjenja (AC, DC).</li>
+  <li>Dolgoročni cilj je objava metodologije kot konferenčnega prispevka – zraven naloge je usmerjanje pripravljeno na oddajo na WEVi 2026/2027.</li>
+</ul>
+
+</body>
+</html>

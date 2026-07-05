@@ -1,0 +1,8 @@
+activity,n,dist_mean,dist_std,dur_mean
+Business,4,1.73,1.56,24.14
+Education,6,1.09,1.65,28.82
+Leisure,34,4.8,4.38,21.11
+Personal,20,6.56,3.95,14.9
+Shopping,14,2.47,2.8,14.18
+Transport,4,6.83,7.95,43.62
+Work,18,1.11,1.78,18.92

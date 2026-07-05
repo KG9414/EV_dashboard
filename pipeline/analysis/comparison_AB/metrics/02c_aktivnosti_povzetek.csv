@@ -1,0 +1,3 @@
+config,JSD,chi2,chi2_p
+"N=25, trips=4 (primarna)",0.1887,12.537,0.051
+"N=100 (A=4t, B=2t, sekundarna)",0.2681,62.67,0.0

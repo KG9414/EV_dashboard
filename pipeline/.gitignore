@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Pipeline outputs & caches (research-only, too heavy for git)
+pipeline/cache/
+pipeline/__pycache__/
+pipeline/00_NHTS_data.csv
+pipeline/df_*.xlsx
+pipeline/Selected_profiles_v1.xlsx
+
+# Pre-computed simulation outputs (these are reproducible; only ship a couple in data/scenarios/)
+pipeline/01_Trips_parameters/
+pipeline/02_Trips/
+pipeline/03_Vehicle_parameters/
+pipeline/04_SoC_flexibility/
+pipeline/01_Trips_parameters_*.xlsx
+pipeline/03_Vehicle_trip_parameters_*.xlsx
+pipeline/03_Vehicle_trip_parameters_5_EVs_2_trips_1_days.xlsx
+
+# Large generated OSM exports (whole folder is "built locally" per README)
+data/osm/*.geojson
+data/osm/*.json
+data/osm/krsko_osm_tags.xlsx
+data/osm/krsko_tag_summary.xlsx
+pipeline/krsko_osm_tags.xlsx
+
+# API response caches (regenerable, not source) — analysis/comparison_AB/cache/
+# even contains a byte-identical duplicate of a root cache/ file, confirming these are disposable
+cache/
+analysis/*/cache/
+
+# Pipeline run logs (transient stdout dumps, not source)
+pipeline/*_run.log

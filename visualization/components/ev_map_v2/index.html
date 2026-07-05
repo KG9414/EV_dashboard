@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #e8e8e8; }
+#deck-container { width: 100%; height: 100%; position: relative; }
+canvas { outline: none; display: block; }
+#controls {
+  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+  z-index: 100; background: rgba(20,30,50,0.88); color: white;
+  border-radius: 10px; padding: 7px 14px;
+  font-family: system-ui,-apple-system,sans-serif; font-size: 13px;
+  display: flex; align-items: center; gap: 10px;
+  user-select: none; white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+  pointer-events: all;
+}
+#controls button {
+  background: #3b82f6; color: white; border: none; border-radius: 6px;
+  padding: 3px 11px; cursor: pointer; font-size: 15px;
+}
+#controls button:hover { background: #2563eb; }
+#slider { width: 180px; cursor: pointer; accent-color: #3b82f6; }
+#timeLabel { min-width: 40px; font-weight: 700; font-size: 14px; }
+#countLabel { opacity: 0.7; font-size: 11px; }
+</style>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css">
+</head>
+<body>
+<div id="deck-container"></div>
+<div id="controls">
+  <button id="playBtn">⏸</button>
+  <input type="range" id="slider" min="0" max="95" value="0" step="1">
+  <span id="timeLabel">00:00</span>
+  <span id="countLabel"></span>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/deck.gl@8.9.34/dist.min.js"></script>
+<script>
+const { DeckGL, ScatterplotLayer, PolygonLayer } = deck;
+
+// ── State ──────────────────────────────────────────────────────────────────
+let currentT  = 0;
+let playing   = true;
+let deckInst  = null;
+let animTimer = null;
+
+let positions  = [];   // array[nFrames] of Float32Array(2*nV)
+let colors     = [];   // array[nFrames] of Uint8Array(4*nV)
+let vMeta      = [];   // array[nV] of {vid, trip_class, tooltip}
+let staticData = null;
+
+const TIME_LABELS = Array.from({length:96},(_,i)=>
+  `${String(Math.floor(i*15/60)).padStart(2,'0')}:${String((i*15)%60).padStart(2,'0')}`);
+
+// ── Streamlit component protocol ──────────────────────────────────────────
+function sendReady() {
+  window.parent.postMessage({
+    isStreamlitMessage: true,
+    type: 'streamlit:componentReady',
+    apiVersion: 1,
+  }, '*');
+}
+
+function sendValue(value) {
+  window.parent.postMessage({
+    isStreamlitMessage: true,
+    type: 'streamlit:setComponentValue',
+    value: value,
+    dataType: 'json',   // required — without this Streamlit ignores the message
+  }, '*');
+}
+
+window.addEventListener('message', e => {
+  if (e.data && e.data.type === 'streamlit:render') handleRender(e.data.args || {});
+});
+
+// ── Render handler ────────────────────────────────────────────────────────
+function handleRender(args) {
+  const firstRender = !deckInst;
+
+  if (args.frames_compact) {
+    const fc = args.frames_compact;
+    positions = fc.positions.map(a => new Float32Array(a));
+    colors    = fc.colors.map(a => new Uint8Array(a));
+    vMeta     = fc.meta;
+    document.getElementById('slider').max = positions.length - 1;
+  }
+  if (args.static) staticData = args.static;
+
+  if (firstRender) {
+    if (typeof args.initialT === 'number') currentT = args.initialT;
+    if (typeof args.playing  === 'boolean') playing  = args.playing;
+    initDeck();
+    if (playing) startAnim(); else stopAnim();
+  } else {
+    // On re-render (filter change / click rerun): update layers.
+    // Also respect playing flag sent from Python.
+    if (typeof args.playing === 'boolean' && !args.playing && playing) stopAnim();
+    updateLayers();
+  }
+  updateUI();
+}
+
+// ── Build vehicle data for current frame ──────────────────────────────────
+function buildVehicleData() {
+  if (!positions.length) return [];
+  const pos = positions[currentT];
+  const col = colors[currentT];
+  const nV  = vMeta.length;
+  const out = [];
+  for (let i = 0; i < nV; i++) {
+    const a = col[i*4+3];
+    if (a === 0) continue;               // filtered-out vehicles are transparent — skip
+    out.push({
+      position:   [pos[i*2], pos[i*2+1]],
+      fill_color: [col[i*4], col[i*4+1], col[i*4+2], a],
+      vid:        vMeta[i].vid,
+      trip_class: vMeta[i].trip_class,
+      tooltip:    vMeta[i].tooltip,
+    });
+  }
+  return out;
+}
+
+// ── Build all layers ──────────────────────────────────────────────────────
+function buildLayers() {
+  const layers = [];
+  if (staticData) {
+    if (staticData.neigh?.length)
+      layers.push(new PolygonLayer({
+        id:'neigh', data:staticData.neigh,
+        getPolygon: d=>d.polygon, getFillColor: d=>d.fill_color,
+        stroked:false, pickable:false,
+      }));
+    if (staticData.bld?.length)
+      layers.push(new PolygonLayer({
+        id:'bld', data:staticData.bld,
+        getPolygon: d=>d.polygon, getFillColor: d=>d.fill_color,
+        stroked:false, pickable:false,
+      }));
+    if (staticData.bld_pts?.length)
+      layers.push(new ScatterplotLayer({
+        id:'bld_pts', data:staticData.bld_pts,
+        getPosition: d=>d.position, getRadius:6, radiusMinPixels:2,
+        getFillColor: d=>d.fill_color, stroked:false, pickable:false,
+      }));
+  }
+  const vData = buildVehicleData();
+  layers.push(new ScatterplotLayer({
+    id: 'vehicles',
+    data: vData,
+    getPosition:   d => d.position,
+    getRadius:     30,
+    radiusMinPixels: 5,
+    getFillColor:  d => d.fill_color,
+    getLineColor:  [255,255,255,180],
+    lineWidthMinPixels: 1,
+    stroked: true,
+    pickable: true,
+    autoHighlight: true,
+    highlightColor: [255, 255, 255, 80],
+    updateTriggers: { getPosition: currentT, getFillColor: currentT },
+    onClick: info => {
+      if (info.object) {
+        stopAnim();
+        sendValue({
+          selected: { trip_class: info.object.trip_class, vid: info.object.vid },
+          t: currentT,
+        });
+      }
+    },
+  }));
+  return layers;
+}
+
+// ── Deck.gl init ──────────────────────────────────────────────────────────
+function initDeck() {
+  deckInst = new DeckGL({
+    parent: document.getElementById('deck-container'),
+    mapStyle: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+    maplibregl: maplibregl,
+    initialViewState: {
+      latitude: 45.9580, longitude: 15.4950, zoom: 14, pitch: 0, bearing: 0,
+    },
+    // Explicit controller config — enables scroll-wheel zoom inside the iframe
+    controller: {
+      scrollZoom: true,
+      doubleClickZoom: true,
+      dragPan: true,
+      dragRotate: false,
+      touchRotate: false,
+      keyboard: true,
+    },
+    layers: buildLayers(),
+    getTooltip: ({object}) => object && {
+      html: object.tooltip,
+      style: {
+        backgroundColor: '#1E293B', color: 'white',
+        fontSize: '12px', padding: '6px 10px', borderRadius: '6px',
+      },
+    },
+  });
+
+  // Ensure wheel events on the canvas zoom the map, not scroll the parent page
+  const canvas = document.querySelector('#deck-container canvas');
+  if (canvas) {
+    canvas.addEventListener('wheel', e => e.stopPropagation(), { passive: false });
+  }
+}
+
+function updateLayers() {
+  if (deckInst) deckInst.setProps({ layers: buildLayers() });
+}
+
+// ── Animation ─────────────────────────────────────────────────────────────
+function startAnim() {
+  if (animTimer) return;
+  playing = true;
+  animTimer = setInterval(() => {
+    if (!positions.length) return;
+    currentT = (currentT + 1) % positions.length;
+    updateLayers();
+    updateUI();
+  }, 400);   // ~2.5 fps — comfortable to follow
+  document.getElementById('playBtn').textContent = '⏸';
+}
+
+function stopAnim() {
+  if (animTimer) { clearInterval(animTimer); animTimer = null; }
+  playing = false;
+  document.getElementById('playBtn').textContent = '▶';
+}
+
+function updateUI() {
+  document.getElementById('slider').value = currentT;
+  document.getElementById('timeLabel').textContent = TIME_LABELS[currentT] || '00:00';
+  document.getElementById('countLabel').textContent =
+    vMeta.length > 0 ? `${vMeta.length} vozil` : '';
+}
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (playing) stopAnim(); else startAnim();
+});
+document.getElementById('slider').addEventListener('input', e => {
+  stopAnim();
+  currentT = parseInt(e.target.value, 10);
+  updateLayers();
+  updateUI();
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+sendReady();
+</script>
+</body>
+</html>

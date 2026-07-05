@@ -1,0 +1,74 @@
+Comparison Velenje: Model A (ORS isochrone) vs Model B v2 (ORS isochrone + Haversine-KNN fallback)
+======================================================================
+
+A parquet: /Users/karlagliha/Documents/Documents/Faks/Magisterij/MagistrskaNaloga/DomCenter/analysis/comparison_AB/raw_runs/A_N25_4trips.parquet
+B parquet: /Users/karlagliha/Documents/Documents/Faks/Magisterij/MagistrskaNaloga/DomCenter/analysis/comparison_AB/raw_runs/B_velenje/B_velenje_N25_4trips.parquet
+
+A distance_km: mean=15.83, median=9.02, max=86.91
+B distance_km: mean=5.24, median=4.59, max=16.61
+
+Distance — KS statistic: 0.370, p=0.0000
+Distance — Wasserstein:  10.59 km
+
+Departure time — KS: 0.000, p=1.0000  (expected ~0 — identical Step 1)
+
+Activity distributions (identical between A and B — shared Step 1 Markov):
+  Business    : A=4.0%  B=4.0%
+  Education   : A=6.0%  B=6.0%
+  Leisure     : A=34.0%  B=34.0%
+  Personal    : A=20.0%  B=20.0%
+  Shopping    : A=14.0%  B=14.0%
+  Transport   : A=4.0%  B=4.0%
+  Work        : A=18.0%  B=18.0%
+
+B Haversine-KNN fallback rate: 0% (ORS isochrone alone handled all trips)
+
+Key finding (UPDATED after run_B_velenje.py v2):
+  - Trip types and departure times are IDENTICAL between A and B.
+  - B v2 now uses the SAME primary method as A (ORS isochrone), with a
+    distance-aware Haversine-KNN fallback (never triggered: 0/100 this run).
+  - Despite using the same method, B's mean distance barely changed:
+    v1 (Haversine-ring-only) 5.02 km -> v2 (ORS isochrone primary) 5.24 km.
+  - MECHANISM (confirmed from run log): for Work/Education/Business in Velenje,
+    the precise annular isochrone zone (floor-to-ceil trip duration) is empty
+    37/100 times (100% of Education trips, 56% of Work trips) because Velenje has
+    few tagged buildings of those types in ABSOLUTE terms (work=74, edu=19
+    citywide). When empty, ors_isochrone_filter falls back to the FULL isochrone
+    from 0 minutes, and the gravity model's distance decay (beta=2, ~1/d^2) then
+    heavily favours whatever is nearest in that wide pool, regardless of budget.
+  - CORRECTION (2026-06-17, verified against real data): the original 'sparse/
+    incomplete OSM data' and 'Velenje is the smaller town' explanations were BOTH
+    wrong. OSM object density per km^2 is actually HIGHER in Velenje than Krsko
+    in every category (work 0.89 vs 0.47/km^2, edu 0.23 vs 0.07/km^2, leisure 1.22
+    vs 0.41/km^2). Per SURS (stat.si/obcine, mid-2023/2024): Velenje municipality
+    has 33,680 people on 84 km^2 (401/km^2, ~4x national average) -- MORE people
+    than all of Krsko municipality (26,070 on 287 km^2, 91/km^2, below average).
+    Velenje settlement is Slovenia's 6th largest town; Krsko town isn't top 10.
+  - REAL CAUSE: Velenje is smaller by MUNICIPALITY LAND AREA (84 vs 287 km^2),
+    not by population or OSM density. The small area caps how many distinct
+    Work/Education buildings can exist, even when densely packed. This is a
+    believable feature of Velenje's compact, dense urban form, not a data flaw.
+
+======================================================================
+SURS 2025 reality check (NEW)
+======================================================================
+Source: SURS, Potovalne navade prebivalstva, Slovenija, 2025 (exact URL not yet confirmed)
+Real-world distance/trip range (workday-non-workday, all-mode): [13.7, 16.6] km
+
+Model A mean (15.8 km): INSIDE the real range
+Model B mean (5.2 km): OUTSIDE the real range
+
+Model A's distance output falls inside the real SURS range; Model B's does not.
+Per the corrected finding above, this is NOT evidence that ORS isochrones are
+inherently 'more correct' — A and B now use the SAME primary method, and
+Velenje's OSM tagging density is actually higher than Krsko's, not lower.
+Velenje (33,680 people / 84 km^2 = 401/km^2, ~4x national average) is a
+compact, dense town where short trips are plausible. Krsko municipality
+(26,070 people / 287 km^2 = 91/km^2, below national average) is sparsely
+populated and spread across several separate settlements, where longer trips
+(13-15 km, matching SURS) are equally plausible. Both numbers may be realistic
+for their own place; comparing either to one national SURS average does not
+establish which destination-selection method is 'more correct.'
+
+CAVEAT: SURS range is ALL-MODE (car+walk+bike+PT+other), national, not Velenje-
+specific or car-only. Treat as a plausibility check, not a precise target.
