@@ -1,0 +1,9 @@
+streamlit
+matplotlib
+pandas
+numpy
+geopandas
+pydeck
+shapely
+osmnx
+openpyxl
