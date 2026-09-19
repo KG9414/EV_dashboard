@@ -1,0 +1,51 @@
+{
+  "krsko_n100": {
+    "vehicles": 100,
+    "trips_per_day": 2,
+    "total_trips": 200,
+    "mean_distance_km": 15.25,
+    "median_distance_km": 12.05,
+    "std_dev_km": 12.2,
+    "percentile_25_km": 6.38,
+    "percentile_75_km": 19.49,
+    "min_km": 1.59,
+    "max_km": 63.97
+  },
+  "velenje_n25_from_article": {
+    "vehicles": 25,
+    "trips_per_day": 2,
+    "model_a_mean_km": 15.8,
+    "model_b_mean_km": 5.2,
+    "model_b_reduction_percent": 67.1
+  },
+  "comparison": {
+    "krsko_vs_velenje_a_ratio": 0.97,
+    "krsko_vs_velenje_b_ratio": 2.93
+  },
+  "tier2_planning": {
+    "tier2_10pct": {
+      "penetration_percent": 10,
+      "total_vehicles": 1680,
+      "vehicles_2trips": 1377,
+      "vehicles_4trips": 302
+    },
+    "tier2_20pct": {
+      "penetration_percent": 20,
+      "total_vehicles": 3360,
+      "vehicles_2trips": 2755,
+      "vehicles_4trips": 604
+    },
+    "tier2_50pct": {
+      "penetration_percent": 50,
+      "total_vehicles": 8401,
+      "vehicles_2trips": 6888,
+      "vehicles_4trips": 1512
+    },
+    "tier2_100pct": {
+      "penetration_percent": 100,
+      "total_vehicles": 16803,
+      "vehicles_2trips": 13778,
+      "vehicles_4trips": 3024
+    }
+  }
+}

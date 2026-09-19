@@ -76,19 +76,10 @@ LEGEND_LABELS = {
 
 def get_krsko_clusters():
 
-    place = "Krško, Slovenia"
+    from spatial_config import PLACE, CLUSTER_TAGS, features_from_place
 
-    tags = {
-        "landuse":  True,
-        "leisure":  True,
-        "amenity":  True,
-        "natural":  True,
-        "water":    True,
-        "waterway": True,
-        "building": True,
-    }
-
-    gdf = ox.features_from_place(place, tags)
+    # Najprej posnetek (data/osm_snapshot), sicer osmnx.
+    gdf = features_from_place(PLACE, CLUSTER_TAGS)
 
     gdf_proj = gdf.to_crs(epsg=3857)
 

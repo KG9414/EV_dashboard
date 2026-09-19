@@ -5,8 +5,27 @@ import numpy as np
 import folium
 import webbrowser
 from shapely.geometry import shape, Point, Polygon
+# ROUTING_MODE: 'ors' (default, OpenRouteService API) or 'local' (OSMnx road
+# network from cache/krsko_drive.graphml, drive-time zones in local_isochrone.py).
+# Local mode needs no API calls and is used for the Tier 2 penetration runs,
+# where ORS daily quotas make API-based routing infeasible.
+ROUTING_MODE = os.environ.get("ROUTING_MODE", "ors").lower()
+if ROUTING_MODE == "local":
+    os.environ.setdefault("ORS_API_KEY", "unused-in-local-mode")
+
 from Functions_step_2 import (id_of_area, sample_destination,
-route_parameters, init, haversine, haversine_ring_filter, ors_isochrone_filter)
+route_parameters, init, haversine, haversine_ring_filter, ors_isochrone_filter,
+route_parameters_local)
+
+if ROUTING_MODE == "local":
+    from local_isochrone import local_isochrone_filter as ors_isochrone_filter, TIME_FACTOR
+    def route_parameters(start_lat, start_lon, end_lat, end_lon):
+        # OSMnx distance as is; duration rescaled to ORS driving times
+        dist, dur, route = route_parameters_local(start_lat, start_lon, end_lat, end_lon)
+        return dist, dur * TIME_FACTOR, route
+    print("ROUTING_MODE=local: OSMnx routing + road-network drive-time zones (no ORS calls)")
+else:
+    print("ROUTING_MODE=ors: OpenRouteService routing + isochrones")
 
 MAX_HOME_RADIUS_KM = 15.0
 
@@ -192,14 +211,14 @@ for i in range(number_of_vehicles * number_of_days):
                         candidates = haversine_ring_filter(init_data, trip_type, start_lat, start_lon, duration_ext)
 
                     if candidates is None:
-                        print("No candidates found even at 59 min range. Skipping trip.")
-                        start_location_name.append('Skipped')
-                        start_location_lat.append(0.0)
-                        start_location_lon.append(0.0)
+                        print("No candidates found even at 59 min range. Skipping trip (vehicle stays at start location).")
+                        start_location_name.append(start_name)
+                        start_location_lat.append(start_lat)
+                        start_location_lon.append(start_lon)
                         trip_type_matrix.append(trip_type)
-                        end_location_name.append('Skipped')
-                        end_location_lat.append(0.0)
-                        end_location_lon.append(0.0)
+                        end_location_name.append(start_name)
+                        end_location_lat.append(start_lat)
+                        end_location_lon.append(start_lon)
                         calculated_distance.append(0.0)
                         calculated_duration.append(0.0)
                         calculated_consumption.append(0.0)
@@ -230,22 +249,23 @@ for i in range(number_of_vehicles * number_of_days):
                         start_location_lat.append(start_lat)
                         start_location_lon.append(start_lon)
                         trip_type_matrix.append(trip_type)
-                        end_location_name.append('Skipped')
-                        end_location_lat.append(0.0)
-                        end_location_lon.append(0.0)
+                        end_location_name.append(start_name)
+                        end_location_lat.append(start_lat)
+                        end_location_lon.append(start_lon)
                         calculated_distance.append(0.0)
                         calculated_duration.append(0.0)
                         calculated_consumption.append(0.0)
                         continue
 
                     if distance == 0 or new_duration == 0:
+                        print("Unroutable destination — vehicle stays at start location.")
                         start_location_name.append(start_name)
                         start_location_lat.append(start_lat)
                         start_location_lon.append(start_lon)
                         trip_type_matrix.append(trip_type)
-                        end_location_name.append(end_name)
-                        end_location_lat.append(end_lat)
-                        end_location_lon.append(end_lon)
+                        end_location_name.append(start_name)
+                        end_location_lat.append(start_lat)
+                        end_location_lon.append(start_lon)
                         calculated_distance.append(0.0)
                         calculated_duration.append(0.0)
                         calculated_consumption.append(0.0)

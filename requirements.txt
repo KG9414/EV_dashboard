@@ -7,3 +7,5 @@ pydeck
 shapely
 osmnx
 openpyxl
+plotly>=5.18,<6.0
+pyarrow

@@ -57,3 +57,8 @@ analysis/*/cache/
 
 # Pipeline run logs (transient stdout dumps, not source)
 pipeline/*_run.log
+
+# Tier 2 runs and flexibility aggregation outputs (large, reproducible)
+pipeline/Tier_runs_local_routing/
+pipeline/05_Flexibility/
+pipeline/04_Spatial/
