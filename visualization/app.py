@@ -236,21 +236,21 @@ _SCENARIOS = [
     },
     {
         "label":    "Scenario 3 — 20 % EV",
-        "desc":     "Data not yet available.",
+        "desc":     "Results available as aggregated fleet flexibility only.",
         "file_4t":  None,
         "file_2t":  None,
         "available": False,
     },
     {
         "label":    "Scenario 4 — 50 % EV",
-        "desc":     "Data not yet available.",
+        "desc":     "Results available as aggregated fleet flexibility only.",
         "file_4t":  None,
         "file_2t":  None,
         "available": False,
     },
     {
         "label":    "Scenario 5 — 100 % EV",
-        "desc":     "Data not yet available.",
+        "desc":     "Results available as aggregated fleet flexibility only.",
         "file_4t":  None,
         "file_2t":  None,
         "available": False,
@@ -304,7 +304,12 @@ with st.sidebar:
                 st.error(f"File does not exist: {Path(fp).name}")
                 st.stop()
     else:
-        st.info(f"⏳ {sel_scenario['desc']}")
+        st.info(
+            f"{sel_scenario['desc']} With 3,360–16,803 vehicles the per-vehicle map "
+            "and charts are too heavy to build in the browser, so this scenario is "
+            "shown as aggregated results on the Fleet flexibility page."
+        )
+        st.page_link("pages/1_Fleet_flexibility.py", label="Open Fleet flexibility", icon="📈")
         st.stop()
 
     st.divider()
@@ -972,7 +977,19 @@ with tab_energy_snapshot:
     energy_peak  = data["zone_energy_combined"].max(axis=1)
     values_peak  = [float(energy_peak[i]) for i in range(len(zones))]
 
-    fig_snap = go.Figure()
+    from plotly.subplots import make_subplots
+
+    # Daily energy [kWh] and peak power [kW] are different quantities, so they
+    # get separate radial axes (previously both were drawn on one kWh axis).
+    fig_snap = make_subplots(
+        rows=1, cols=2,
+        specs=[[{"type": "polar"}, {"type": "polar"}]],
+        subplot_titles=("Total daily energy [kWh]", "Peak charging power [kW]"),
+        horizontal_spacing=0.22,
+    )
+    # Subplot titles sit above the angular labels (e.g. "Commercial").
+    for _ann in fig_snap.layout.annotations:
+        _ann.y = _ann.y + 0.12
     fig_snap.add_trace(go.Barpolar(
         r=values_daily,
         theta=zones,
@@ -982,51 +999,45 @@ with tab_energy_snapshot:
         marker_line_width=1.5,
         opacity=0.85,
         hovertemplate="<b>%{theta}</b><br>Total: %{r:.1f} kWh<extra></extra>",
-    ))
+    ), row=1, col=1)
     fig_snap.add_trace(go.Barpolar(
         r=values_peak,
         theta=zones,
-        name="Peak demand (kW)",
+        name="Peak power (kW)",
         marker_color=zone_colors_snap,
         marker_line_color="white",
         marker_line_width=1.5,
-        opacity=0.35,
+        opacity=0.85,
         hovertemplate="<b>%{theta}</b><br>Peak: %{r:.1f} kW<extra></extra>",
-    ))
+    ), row=1, col=2)
 
-    max_r = max(max(values_daily), max(values_peak)) if values_daily else 1
-
+    _polar_common = dict(
+        angularaxis=dict(tickfont=dict(size=12), gridcolor="rgba(0,0,0,0.08)"),
+        bgcolor="rgba(0,0,0,0)",
+    )
     fig_snap.update_layout(
-        title=dict(
-            text="Total daily energy demand per zone",
-            x=0.5,
-            font=dict(size=16),
-        ),
         polar=dict(
-            radialaxis=dict(
-                visible=True,
-                range=[0, max_r * 1.15],
-                ticksuffix=" kWh",
-                tickfont=dict(size=10),
-                gridcolor="rgba(0,0,0,0.12)",
-            ),
-            angularaxis=dict(
-                tickfont=dict(size=13),
-                gridcolor="rgba(0,0,0,0.08)",
-            ),
-            bgcolor="rgba(0,0,0,0)",
+            radialaxis=dict(visible=True, range=[0, (max(values_daily) if values_daily else 1) * 1.15],
+                            ticksuffix=" kWh", tickfont=dict(size=10),
+                            gridcolor="rgba(0,0,0,0.12)"),
+            **_polar_common,
         ),
-        showlegend=True,
-        legend=dict(x=0.85, y=1.1),
-        height=520,
-        margin=dict(t=80, b=40, l=60, r=60),
+        polar2=dict(
+            radialaxis=dict(visible=True, range=[0, (max(values_peak) if values_peak else 1) * 1.15],
+                            ticksuffix=" kW", tickfont=dict(size=10),
+                            gridcolor="rgba(0,0,0,0.12)"),
+            **_polar_common,
+        ),
+        showlegend=False,
+        height=560,
+        margin=dict(t=110, b=40, l=70, r=70),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
     )
 
     with st.container(border=True):
         st.subheader("Energy snapshot")
-        st.caption("Total daily energy demand per zone (radial view).")
+        st.caption("Per zone: total daily charging energy (left, kWh) and peak charging power (right, kW).")
         st.plotly_chart(fig_snap, use_container_width=True)
 
 
